@@ -81,6 +81,22 @@ app.get("/restaurants", async (req, res) => {
   }
 });
 
+app.get("/restaurants/search", async (req, res) => {
+  try {
+    const { query } = req.query;  // Get query from the request
+    const restaurants = await Restaurant.find({
+      $or: [
+        { name: { $regex: query, $options: "i" } },  // Search for restaurant name
+        { cuisines: { $regex: query, $options: "i" } },  // Search for cuisines
+        { city: { $regex: query, $options: "i" } },  // Search for city
+      ],
+    });
+    res.json(restaurants);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error" });
+  }
+});
+
 // Image-based search for food (optional additional feature)
 app.post("/search-food", (req, res) => {
   const { imagePath } = req.body; // You can upload an image and extract path here
