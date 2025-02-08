@@ -32,7 +32,7 @@ const RestaurantList = () => {
     formData.append("image", file);
 
     try {
-      const response = await fetch("http://localhost:5000/api.restaurants/img-search", {
+      const response = await fetch("http://zomato-production-3c01.up.railway.app/api.restaurants/img-search", {
         method: "POST",
         body: formData,
       });

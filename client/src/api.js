@@ -4,7 +4,7 @@ const API_BASE_URL = "zomato-production-3c01.up.railway.app/api"; // Change if n
 
 export const fetchRestaurants = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/restaurants`);
+    const response = await fetch(`${API_BASE_URL}/restaurants`);
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
     const data = await response.json();
