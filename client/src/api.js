@@ -1,10 +1,10 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api"; // Change if needed
+const API_BASE_URL = "zomato-production-3c01.up.railway.app/api"; // Change if needed
 
 export const fetchRestaurants = async () => {
   try {
-    const response = await fetch("http://localhost:5000/api/restaurants");
+    const response = await fetch(`${API_BASE_URL}/api/restaurants`);
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
     const data = await response.json();
