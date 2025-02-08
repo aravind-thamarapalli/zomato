@@ -1,5 +1,4 @@
 const { getDB } = require('../config/db');
-const ObjectId = require('mongodb').ObjectId;
 
 /**
  * Get Restaurants with Filtering and Pagination
@@ -23,6 +22,7 @@ const getRestaurants = async (req, res) => {
 
         res.json(restaurants);
     } catch (error) {
+        console.error("Error fetching restaurants:", error);
         res.status(500).json({ message: 'Error fetching restaurants', error: error.message });
     }
 };
@@ -33,13 +33,40 @@ const getRestaurants = async (req, res) => {
 const getRestaurantById = async (req, res) => {
     try {
         const db = getDB();
-        const restaurant = await db.collection('restaurants').findOne({ "restaurant.id": req.params.restaurantId });
-        if (!restaurant) return res.status(404).json({ message: 'Restaurant not found' });
-        res.json(restaurant);
+        const restaurantId = parseInt(req.params.id, 10); // Convert to number
+
+        if (isNaN(restaurantId)) {
+            return res.status(400).json({ message: 'Invalid Restaurant ID' });
+        }
+
+        console.log("Searching for restaurant with ID:", restaurantId);
+
+        // Use $elemMatch to search inside the `restaurants` array
+        const document = await db.collection('restaurants').findOne({
+            restaurants: {
+                $elemMatch: { "restaurant.R.res_id": restaurantId }
+            }
+        });
+
+        console.log("Database search result:", document);
+
+        if (!document) {
+            return res.status(404).json({ message: 'Restaurant not found' });
+        }
+
+        // Extract the correct restaurant object from the `restaurants` array
+        const matchingRestaurant = document.restaurants.find(r => r.restaurant.R.res_id === restaurantId);
+
+        res.json(matchingRestaurant.restaurant);
     } catch (error) {
+        console.error("Error fetching restaurant details:", error);
         res.status(500).json({ message: 'Error fetching restaurant details', error: error.message });
     }
 };
+
+
+
+
 
 /**
  * Get Restaurants by Location (GeoJSON Query)
@@ -64,6 +91,7 @@ const getRestaurantsByLocation = async (req, res) => {
 
         res.json(restaurants);
     } catch (error) {
+        console.error("Error fetching restaurants by location:", error);
         res.status(500).json({ message: 'Error fetching restaurants by location', error: error.message });
     }
 };
