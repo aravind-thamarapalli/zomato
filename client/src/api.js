@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:5000/api"; // ✅ API base URL
+const API_BASE_URL = "https://zomato-production-3c01.up.railway.app/api"; // ✅ API base URL
 
 // Fetch all restaurants
 export const fetchRestaurants = async () => {
