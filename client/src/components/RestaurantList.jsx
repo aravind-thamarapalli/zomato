@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchRestaurants } from "../api";
+import { fetchRestaurants, searchCuisineByImage } from "../api";
 import { Link } from "react-router-dom";
 import "./RestaurantList.css";
 
@@ -8,10 +8,13 @@ const RestaurantList = () => {
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("");
+  const [imageCuisine, setImageCuisine] = useState(""); // Cuisine detected from uploaded image
+  const [loading, setLoading] = useState(false);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [imageSearchLabels, setImageSearchLabels] = useState([]);
   const restaurantsPerPage = 9;
+  const RADIUS_KM = 30; // Search radius of 3 km
 
   useEffect(() => {
     const getRestaurants = async () => {
@@ -23,30 +26,56 @@ const RestaurantList = () => {
     getRestaurants();
   }, []);
 
-  // Image Upload Handler
+  // Handle Image Upload and Cuisine Detection
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("image", file);
-
+    setLoading(true);
     try {
-      const response = await fetch("http://zomato-production-3c01.up.railway.app/api.restaurants/img-search", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.labels) {
-        setImageSearchLabels(data.labels);
-      }
+      const detectedCuisine = await searchCuisineByImage(file);
+      setImageCuisine(detectedCuisine || "");
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.error("Error detecting cuisine:", error);
+    }
+    setLoading(false);
+  };
+
+  // Calculate distance between two coordinates using Haversine formula
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const toRad = (value) => (value * Math.PI) / 180;
+    const R = 6371; // Earth's radius in km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
+  // Get User's Current Location
+  const detectLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLatitude(position.coords.latitude);
+          setLongitude(position.coords.longitude);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          alert("Could not retrieve location. Please enable location services.");
+        }
+      );
+    } else {
+      alert("Geolocation is not supported by your browser.");
     }
   };
 
-  // Filtering logic based on search and image labels
+  // Filtering logic based on search, cuisine, and location
   useEffect(() => {
     let filtered = restaurants.filter((r) =>
       r.restaurant.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -58,23 +87,24 @@ const RestaurantList = () => {
       );
     }
 
-    if (selectedCountry) {
+    if (imageCuisine) {
       filtered = filtered.filter((r) =>
-        r.restaurant.location.country_id === Number(selectedCountry)
+        r.restaurant.cuisines.toLowerCase().includes(imageCuisine.toLowerCase())
       );
     }
 
-    if (imageSearchLabels.length > 0) {
-      filtered = filtered.filter((r) =>
-        imageSearchLabels.some((label) =>
-          r.restaurant.cuisines.toLowerCase().includes(label.toLowerCase())
-        )
-      );
+    if (latitude && longitude) {
+      filtered = filtered.filter((r) => {
+        const resLat = r.restaurant.location.latitude;
+        const resLon = r.restaurant.location.longitude;
+        if (!resLat || !resLon) return false;
+        return getDistance(latitude, longitude, resLat, resLon) <= RADIUS_KM;
+      });
     }
 
     setFilteredRestaurants(filtered);
     setCurrentPage(1);
-  }, [searchTerm, selectedCuisine, selectedCountry, imageSearchLabels, restaurants]);
+  }, [searchTerm, selectedCuisine, imageCuisine, latitude, longitude, restaurants]);
 
   const indexOfLastRestaurant = currentPage * restaurantsPerPage;
   const indexOfFirstRestaurant = indexOfLastRestaurant - restaurantsPerPage;
@@ -100,11 +130,23 @@ const RestaurantList = () => {
           <option value="Chinese">Chinese</option>
         </select>
 
-        <select onChange={(e) => setSelectedCountry(e.target.value)} className="filter">
-          <option value="">All Countries</option>
-          <option value="1">India</option>
-          <option value="2">USA</option>
-        </select>
+        <div className="location-filters">
+          <input
+            type="number"
+            placeholder="Latitude"
+            value={latitude}
+            onChange={(e) => setLatitude(e.target.value)}
+            className="location-input"
+          />
+          <input
+            type="number"
+            placeholder="Longitude"
+            value={longitude}
+            onChange={(e) => setLongitude(e.target.value)}
+            className="location-input"
+          />
+          {/* <button onClick={detectLocation} className="location-btn">📍 Use My Location</button> */}
+        </div>
 
         <div className="image-upload-container">
           <label htmlFor="imageUpload" className="upload-btn">📷 Upload Image</label>
@@ -117,6 +159,12 @@ const RestaurantList = () => {
           />
         </div>
       </div>
+
+      {loading ? (
+        <p>Detecting cuisine... ⏳</p>
+      ) : (
+        imageCuisine && <p>Detected Cuisine: <strong>{imageCuisine}</strong></p>
+      )}
 
       <ul className="restaurant-list">
         {currentRestaurants.length > 0 ? (
